@@ -1,7 +1,5 @@
 import { create } from 'zustand';
 
-import { ALL_QUESTS } from './questsData';
-
 export type QuestType = 'daily' | 'weekly' | 'coop' | 'special';
 
 export interface Quest {
@@ -44,6 +42,14 @@ export interface Inventory {
   unlockedTitles: string[];
 }
 
+export interface CommentItem {
+  id: string;
+  authorRank: string;
+  authorNickname: string;
+  content: string;
+  timestamp: string;
+}
+
 export interface CommsPost {
   id: string;
   authorRank: string;
@@ -52,221 +58,369 @@ export interface CommsPost {
   content: string;
   likes: number;
   isLikedByMe: boolean;
-  comments?: number;
+  commentList?: CommentItem[];
   timestamp: string;
   type?: 'general' | 'quest';
 }
 
 interface AppState {
+  token: string | null;
   profile: UserProfile;
   quests: Quest[];
   inventory: Inventory;
   commsPosts: CommsPost[];
-  isAdminMode: boolean;
   equippedTitleId: string;
   isAuthenticated: boolean;
-  equipTitle: (titleId: string) => void;
-  login: () => void;
+  isLoading: boolean;
+
+  // Auth
+  login: (username: string, password?: string) => Promise<void>;
   logout: () => void;
-  signup: (userData: Partial<UserProfile>) => void;
-  setBuddyGroupPin: (pin: string) => void;
-  completeQuest: (questId: string) => void;
-  rerollSingleDailyQuest: (questId: string) => void;
+  signup: (userData: any) => Promise<void>;
+
+  // Data Fetching
+  fetchMe: () => Promise<void>;
+  fetchQuests: () => Promise<void>;
+  fetchPosts: () => Promise<void>;
+
+  // Actions
+  equipTitle: (titleId: string) => void;
+  setBuddyGroupPin: (pin: string) => Promise<void>;
+  completeQuest: (questId: string, buddyPin: string) => Promise<void>;
+  rerollSingleDailyQuest: (questId: string) => Promise<void>;
   rerollAllQuests: () => void;
-  addCommsPost: (content: string, type?: 'general' | 'quest') => void;
-  toggleLikeCommsPost: (postId: string) => void;
-  toggleAdminMode: () => void;
+  addCommsPost: (content: string, type?: 'general' | 'quest') => Promise<void>;
+  toggleLikeCommsPost: (postId: string) => Promise<void>;
+  addCommentToPost: (postId: string, content: string) => Promise<void>;
 }
 
-const generateRandomQuests = (): Quest[] => {
-  const daily = ALL_QUESTS.filter(q => q.type === 'daily').sort(() => 0.5 - Math.random()).slice(0, 3);
-  const weekly = ALL_QUESTS.filter(q => q.type === 'weekly').sort(() => 0.5 - Math.random()).slice(0, 3);
-  const coop = ALL_QUESTS.filter(q => q.type === 'coop').sort(() => 0.5 - Math.random()).slice(0, 1);
-  const special = ALL_QUESTS.filter(q => q.type === 'special').sort(() => 0.5 - Math.random()).slice(0, 1);
-  return [...daily, ...weekly, ...coop, ...special];
+const defaultProfile: UserProfile = {
+  userId: '1000',
+  nickname: '고차원',
+  rank: '이병',
+  company: '단본부중대',
+  playerClass: '보병',
+  dDay: 500,
+  buddyGroupPin: undefined,
+  level: 1,
+  currentXP: 0,
+  maxXP: 100,
+  stats: { strength: 0, stamina: 0, intelligence: 0, mental: 0, survival: 0 },
 };
 
-const initialQuests: Quest[] = generateRandomQuests();
+const veteranProfile: UserProfile = {
+  userId: '9999',
+  nickname: '말년병장',
+  rank: '병장',
+  company: '1중대',
+  playerClass: '운전병',
+  dDay: 14,
+  buddyGroupPin: '0220',
+  level: 42,
+  currentXP: 14500,
+  maxXP: 20000,
+  stats: { strength: 95, stamina: 78, intelligence: 92, mental: 99, survival: 88 },
+};
 
-const backupDailyQuests: Quest[] = [
-  { id: 'D010', title: '스쿼트 50개', description: '하체 단련을 위한 스쿼트', difficulty: '중', rewardXP: 25, isCompleted: false, type: 'daily' },
-  { id: 'D011', title: '플랭크 2분', description: '코어 강화를 위한 플랭크 유지', difficulty: '중', rewardXP: 25, isCompleted: false, type: 'daily' },
-  { id: 'D012', title: '군가 3곡 암기', description: '기본 군가 3곡 가사 암기', difficulty: '하', rewardXP: 15, isCompleted: false, type: 'daily' },
-  { id: 'D013', title: '관물대 정리', description: '모포와 전투복 각 잡기', difficulty: '하', rewardXP: 15, isCompleted: false, type: 'daily' },
+const initialQuests: Quest[] = [
+  { id: 'q1', title: '아침 점호 참석', description: '06:30 아침 점호에 늦지 않게 참석하기', difficulty: '하', rewardXP: 15, isCompleted: false, type: 'daily', targetStat: 'mental', statIncrease: 1 },
+  { id: 'q2', title: '체력 단련 (뜀걸음)', description: '연병장 3km 뜀걸음 완주', difficulty: '중', rewardXP: 30, isCompleted: false, type: 'daily', targetStat: 'stamina', statIncrease: 2 },
+  { id: 'q3', title: '주특기 훈련', description: '오후 주특기 훈련 시간 집중하기', difficulty: '상', rewardXP: 45, isCompleted: false, type: 'daily', targetStat: 'intelligence', statIncrease: 2 },
+  { id: 'q4', title: '주간 장비 점검', description: '개인 화기 및 장구류 A급 상태 유지하기', difficulty: '중', rewardXP: 100, isCompleted: false, type: 'weekly', targetStat: 'survival', statIncrease: 3 },
+  { id: 'q7', title: '막사 대청소', description: '생활관 및 구역 대청소 실시', difficulty: '하', rewardXP: 80, isCompleted: false, type: 'weekly', targetStat: 'mental', statIncrease: 2 },
+  { id: 'q8', title: '정신전력교육', description: '정신전력교육 집중해서 시청하기', difficulty: '중', rewardXP: 100, isCompleted: false, type: 'weekly', targetStat: 'mental', statIncrease: 3 },
+  { id: 'q5', title: '전우조 야간 순찰', description: '전우들과 함께 부대 외곽 순찰 돌기', difficulty: '상', rewardXP: 150, isCompleted: false, type: 'coop', targetStat: 'survival', statIncrease: 4 },
+  { id: 'q6', title: '대대장님 특별 지시', description: '진지 보수 공사 파견 지원', difficulty: '상', rewardXP: 300, isCompleted: false, type: 'special', targetStat: 'strength', statIncrease: 5 },
 ];
 
-const initialCommsPosts: CommsPost[] = [
+const initialPosts: CommsPost[] = [
   {
-    id: 'c2',
-    authorRank: '일병',
-    authorNickname: '정일병',
-    authorClass: '소총수',
-    content: '[알림] 사격 2급 칭호 획득 완료했습니다!',
-    likes: 12,
-    isLikedByMe: true,
-    timestamp: '1시간 전',
-  },
-  {
-    id: 'c1',
-    authorRank: '상병',
-    authorNickname: '박상병',
-    authorClass: '공병',
-    content: '일일 퀘스트 "윗몸일으키기 30개" 퀘스트를 완료했습니다. 👍',
-    likes: 5,
+    id: 'p1',
+    authorRank: '병장',
+    authorNickname: '말년병장',
+    authorClass: '보병',
+    content: '전역이 답이다...',
+    likes: 42,
     isLikedByMe: false,
-    timestamp: '2시간 전',
-  }
+    timestamp: '1시간 전',
+    type: 'general',
+    commentList: [
+      { id: 'c1', authorRank: '상병', authorNickname: '김전사', content: '공감합니다...', timestamp: '50분 전' },
+      { id: 'c2', authorRank: '이병', authorNickname: '신병받아라', content: '전역은 언제쯤 올까요 ㅠㅠ', timestamp: '30분 전' }
+    ]
+  },
+  {
+    id: 'p2',
+    authorRank: '상병',
+    authorNickname: '작업반장',
+    authorClass: '공병',
+    content: '오늘 예초 작업 너무 힘들었다.',
+    likes: 15,
+    isLikedByMe: false,
+    timestamp: '3시간 전',
+    type: 'general',
+    commentList: []
+  },
 ];
 
-export const useStore = create<AppState>((set) => ({
-  profile: {
-    userId: '1000',
-    nickname: '고차원',
-    rank: '일병',
-    company: '단본부중대',
-    playerClass: '운전병',
-    dDay: 427,
-    buddyGroupPin: undefined,
-    level: 6,
-    currentXP: 800,
-    maxXP: 1200,
-    stats: {
-      strength: 20,
-      stamina: 25,
-      intelligence: 15,
-      mental: 30,
-      survival: 18,
-    },
-  },
-  inventory: {
-    biscuits: 5,
-    drinks: 2,
-    unlockedTitles: ['t1', 't2', 't3', 't4'],
-  },
-  equippedTitleId: 't3',
+export const useStore = create<AppState>((set, get) => ({
+  token: null,
+  profile: defaultProfile,
+  inventory: { biscuits: 5, drinks: 2, unlockedTitles: ['신병'] },
+  equippedTitleId: '',
   isAuthenticated: false,
+  isLoading: false,
   quests: initialQuests,
-  commsPosts: initialCommsPosts,
-  isAdminMode: false,
-  
-  equipTitle: (titleId: string) => set({ equippedTitleId: titleId }),
-  
-  login: () => set({ isAuthenticated: true }),
-  
-  logout: () => set({ isAuthenticated: false }),
-  
-  signup: (userData) => set((state) => ({
-    profile: {
-      ...state.profile,
-      ...userData,
-    },
-    isAuthenticated: true,
-  })),
-  
-  setBuddyGroupPin: (pin) => set((state) => ({
-    profile: {
-      ...state.profile,
-      buddyGroupPin: pin,
-    }
-  })),
-  
-  toggleAdminMode: () => set((state) => ({ isAdminMode: !state.isAdminMode })),
-  
-  rerollAllQuests: () => set({ quests: generateRandomQuests() }),
+  commsPosts: initialPosts,
 
-  addCommsPost: (content: string, type = 'general') => set((state) => {
-    const newPost: CommsPost = {
-      id: `c_${Date.now()}`,
-      authorRank: state.profile.rank,
-      authorNickname: state.profile.nickname,
-      authorClass: state.profile.playerClass,
-      content,
-      likes: 0,
-      isLikedByMe: false,
-      timestamp: '방금 전',
-      type: type as 'general' | 'quest'
-    };
-    return { commsPosts: [newPost, ...state.commsPosts] };
+  // --- Auth (Mocked) ---
+  login: async (username, password) => {
+    set({ isLoading: true });
+    // 인위적인 지연 효과
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    if (username.toLowerCase() === 'test' && password === '1234') {
+      set({
+        profile: veteranProfile,
+        inventory: {
+          biscuits: 42,
+          drinks: 15,
+          unlockedTitles: [
+            '신병', '강철 신병', '무쇠 전사', '태산의 파괴자',
+            '전장의 철인', '끝없는 진격', '두 개의 심장',
+            '작전 분석관', '전략 책사', '전장의 제갈량',
+            '의지의 군인', '강철 멘탈', '부처님',
+            '노련한 척후병', '고독한 늑대', '불사조'
+          ]
+        },
+        equippedTitleId: '태산의 파괴자',
+        token: 'mock-veteran-token',
+        isAuthenticated: true,
+        isLoading: false
+      });
+    } else {
+      set({ token: 'mock-token-1234', isAuthenticated: true, isLoading: false });
+    }
+  },
+
+  logout: () => set({
+    isAuthenticated: false,
+    token: null,
+    profile: defaultProfile,
+    quests: initialQuests,
+    commsPosts: initialPosts
   }),
 
-  toggleLikeCommsPost: (postId: string) => set((state) => {
-    const newPosts = state.commsPosts.map(post => {
-      if (post.id === postId) {
-        return {
-          ...post,
-          isLikedByMe: !post.isLikedByMe,
-          likes: post.isLikedByMe ? post.likes - 1 : post.likes + 1
-        };
-      }
-      return post;
+  signup: async (userData) => {
+    set({ isLoading: true });
+    await new Promise(resolve => setTimeout(resolve, 800));
+
+    // 로컬 상태 프로필 덮어쓰기
+    const newProfile = {
+      ...defaultProfile,
+      nickname: userData.nickname,
+      rank: userData.rank,
+      company: userData.company,
+      playerClass: userData.playerClass,
+      dDay: userData.dDay, // 회원가입 시 계산된 D-Day 저장
+    };
+
+    set({
+      profile: newProfile,
+      token: 'mock-token-1234',
+      isAuthenticated: true,
+      isLoading: false
     });
-    return { commsPosts: newPosts };
-  }),
+  },
 
-  rerollSingleDailyQuest: (questId: string) => set((state) => {
-    const questIndex = state.quests.findIndex(q => q.id === questId);
-    if (questIndex === -1 || state.quests[questIndex].isRerolled || state.quests[questIndex].isCompleted) {
-      return state;
+  // --- Fetching (Mocked) ---
+  fetchMe: async () => {
+    // 로컬 스토어에 이미 데이터가 있으므로 별도 동작 필요 없음
+  },
+
+  fetchQuests: async () => {
+    // 만약 퀘스트가 비어있다면 초기 퀘스트 지급
+    const currentQuests = get().quests;
+    if (currentQuests.length === 0) {
+      set({ quests: initialQuests });
     }
-    const randomBackup = backupDailyQuests[Math.floor(Math.random() * backupDailyQuests.length)];
-    const newQuest = { ...randomBackup, id: `${randomBackup.id}-${Date.now()}`, isRerolled: true };
-    const newQuests = [...state.quests];
-    newQuests[questIndex] = newQuest;
-    return { quests: newQuests };
-  }),
-  
-  completeQuest: (questId: string) => set((state) => {
-    const quest = state.quests.find((q) => q.id === questId);
-    if (!quest || quest.isCompleted) return state;
+  },
 
-    let newXP = state.profile.currentXP + quest.rewardXP;
-    let newLevel = state.profile.level;
-    let newMaxXP = state.profile.maxXP;
+  fetchPosts: async () => {
+    // 별도 동작 필요 없음 (로컬 상태 사용)
+  },
 
-    while (newXP >= newMaxXP) {
-      newXP -= newMaxXP;
-      newLevel += 1;
-      newMaxXP = Math.floor(newMaxXP * 1.2);
+  // --- Actions (Mocked) ---
+  equipTitle: (titleId: string) => set({ equippedTitleId: titleId }),
+
+  setBuddyGroupPin: async (pin) => {
+    set({ isLoading: true });
+    await new Promise(resolve => setTimeout(resolve, 300));
+    set((state) => ({ profile: { ...state.profile, buddyGroupPin: pin }, isLoading: false }));
+  },
+
+  completeQuest: async (questId, _buddyPin) => {
+    set({ isLoading: true });
+    await new Promise(resolve => setTimeout(resolve, 4000));
+
+    const state = get();
+    const quest = state.quests.find(q => q.id === questId);
+
+    if (quest && !quest.isCompleted) {
+      let newXP = state.profile.currentXP + quest.rewardXP;
+      let newLevel = state.profile.level;
+      let newMaxXP = state.profile.maxXP;
+      let newStats = { ...state.profile.stats };
+
+      // 레벨업 로직
+      if (newXP >= newMaxXP) {
+        newLevel += 1;
+        newXP = newXP - newMaxXP;
+        newMaxXP = Math.floor(newMaxXP * 1.5);
+      }
+
+      let newUnlockedTitles = [...state.inventory.unlockedTitles];
+      let newlyUnlocked = '';
+
+      // 스탯 상승 및 칭호 획득 로직
+      if (quest.targetStat && quest.statIncrease) {
+        newStats = {
+          ...newStats,
+          [quest.targetStat]: (newStats[quest.targetStat as keyof typeof newStats] || 0) + quest.statIncrease
+        };
+
+        const titleMap: Record<string, [number, string][]> = {
+          strength: [[70, '태산의 파괴자'], [50, '무쇠 전사'], [30, '강철 신병']],
+          stamina: [[70, '두 개의 심장'], [50, '끝없는 진격'], [30, '전장의 철인']],
+          intelligence: [[70, '전장의 제갈량'], [50, '전략 책사'], [30, '작전 분석관']],
+          mental: [[70, '부처님'], [50, '강철 멘탈'], [30, '의지의 군인']],
+          survival: [[70, '불사조'], [50, '고독한 늑대'], [30, '노련한 척후병']]
+        };
+
+        const possibleTitles = titleMap[quest.targetStat];
+        if (possibleTitles) {
+          const statVal = newStats[quest.targetStat as keyof typeof newStats] || 0;
+          for (const [threshold, titleName] of possibleTitles) {
+            if (statVal >= (threshold as number) && !newUnlockedTitles.includes(titleName as string)) {
+              newUnlockedTitles.push(titleName as string);
+              newlyUnlocked = titleName as string; // 가장 최근(높은) 달성 칭호 저장
+            }
+          }
+        }
+      }
+
+      set({
+        quests: state.quests.map((q) => q.id === questId ? { ...q, isCompleted: true } : q),
+        profile: {
+          ...state.profile,
+          currentXP: newXP,
+          level: newLevel,
+          maxXP: newMaxXP,
+          stats: newStats
+        },
+        inventory: {
+          ...state.inventory,
+          unlockedTitles: newUnlockedTitles
+        },
+        isLoading: false
+      });
+
+      // 퀘스트 완료 자동 포스트 추가 (스탯 증가 문구 한국어 변환 포함)
+      const statMap: Record<string, string> = {
+        strength: '근력',
+        stamina: '체력',
+        intelligence: '지력',
+        mental: '정신력',
+        survival: '생존술'
+      };
+      const statName = quest.targetStat ? statMap[quest.targetStat] || quest.targetStat : '';
+      const statMsg = quest.targetStat ? ` 및 ${statName} +${quest.statIncrease}` : '';
+      const titleMsg = newlyUnlocked ? `\\n🎉 신규 칭호 [${newlyUnlocked}] 획득!` : '';
+      get().addCommsPost(`[퀘스트 완료] ${quest.title} 완료! (+${quest.rewardXP}XP${statMsg})${titleMsg}`, 'quest');
+    } else {
+      set({ isLoading: false });
     }
+  },
 
-    const statMap: Record<string, keyof UserProfile['stats']> = {
-      '근력': 'strength',
-      '체력': 'stamina',
-      '지능': 'intelligence',
-      '정신력': 'mental',
-      '생존력': 'survival',
+  rerollAllQuests: () => { },
+
+  rerollSingleDailyQuest: async (questId) => {
+    set({ isLoading: true });
+    await new Promise(resolve => setTimeout(resolve, 300));
+
+    // 무작위 새 퀘스트 생성 (모의)
+    const newQuest: Quest = {
+      id: `q_${Date.now()}`,
+      title: '새로운 임무 하달',
+      description: '부대 환경 미화 작업 지원',
+      difficulty: '중',
+      rewardXP: 25,
+      isCompleted: false,
+      type: 'daily',
+      isRerolled: true
     };
-    
-    const newStats = { ...state.profile.stats };
-    if (quest.targetStat && quest.statIncrease) {
-      const statKey = statMap[quest.targetStat] || 'strength';
-      newStats[statKey] += quest.statIncrease;
-    }
 
+    set((state) => ({
+      quests: state.quests.map(q => q.id === questId ? newQuest : q),
+      isLoading: false
+    }));
+  },
+
+  addCommsPost: async (content, type = 'general') => {
+    const state = get();
     const newPost: CommsPost = {
-      id: `c_${Date.now()}`,
+      id: `post_${Date.now()}`,
       authorRank: state.profile.rank,
       authorNickname: state.profile.nickname,
       authorClass: state.profile.playerClass,
-      content: `[임무 완료] ${quest.title} 작전을 성공적으로 완수했습니다! 보상: ${quest.rewardXP}XP`,
+      content: content,
       likes: 0,
       isLikedByMe: false,
       timestamp: '방금 전',
-      type: 'quest'
+      type: type
     };
 
-    return {
-      quests: state.quests.map((q) =>
-        q.id === questId ? { ...q, isCompleted: true } : q
-      ),
-      profile: {
-        ...state.profile,
-        level: newLevel,
-        currentXP: newXP,
-        maxXP: newMaxXP,
-        stats: newStats,
-      },
-      commsPosts: [newPost, ...state.commsPosts],
+    set((s) => ({
+      commsPosts: [newPost, ...s.commsPosts]
+    }));
+  },
+
+  toggleLikeCommsPost: async (postId) => {
+    set(state => ({
+      commsPosts: state.commsPosts.map(post => {
+        if (post.id === postId) {
+          const isLiked = !post.isLikedByMe;
+          return {
+            ...post,
+            isLikedByMe: isLiked,
+            likes: post.likes + (isLiked ? 1 : -1)
+          };
+        }
+        return post;
+      })
+    }));
+  },
+
+  addCommentToPost: async (postId, content) => {
+    const { profile } = get();
+    const newComment: CommentItem = {
+      id: Date.now().toString(),
+      authorRank: profile.rank,
+      authorNickname: profile.nickname,
+      content,
+      timestamp: '방금 전',
     };
-  }),
+
+    set(state => ({
+      commsPosts: state.commsPosts.map(post => {
+        if (post.id === postId) {
+          return {
+            ...post,
+            commentList: [...(post.commentList || []), newComment]
+          };
+        }
+        return post;
+      })
+    }));
+  },
 }));

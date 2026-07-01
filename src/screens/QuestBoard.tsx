@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useStore, QuestType } from '../store/useStore';
 import { Header } from '../components/Header';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
+import { useFocusEffect } from '@react-navigation/native';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'QuestBoard'>;
 
@@ -15,8 +16,14 @@ const TABS: { id: QuestType; label: string }[] = [
 ];
 
 export const QuestBoardScreen: React.FC<Props> = ({ navigation }) => {
-  const { quests, rerollSingleDailyQuest, completeQuest, profile } = useStore();
+  const { quests, rerollSingleDailyQuest, completeQuest, profile, fetchQuests } = useStore();
   const [activeTab, setActiveTab] = useState<QuestType>('daily');
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchQuests();
+    }, [fetchQuests])
+  );
 
   const filteredQuests = quests.filter(q => q.type === activeTab);
 
@@ -65,7 +72,13 @@ export const QuestBoardScreen: React.FC<Props> = ({ navigation }) => {
               <View style={styles.detailsRow}>
                 <Text style={styles.difficulty}>난이도: {item.difficulty}</Text>
                 <Text style={styles.reward}>
-                  보상: +{item.rewardXP} XP {item.targetStat && item.statIncrease ? `/ ${item.targetStat} +${item.statIncrease}` : ''}
+                  보상: +{item.rewardXP} XP {
+                    item.targetStat && item.statIncrease 
+                      ? `/ ${
+                          { strength: '근력', stamina: '체력', intelligence: '지력', mental: '정신력', survival: '생존술' }[item.targetStat] || item.targetStat
+                        } +${item.statIncrease}` 
+                      : ''
+                  }
                 </Text>
               </View>
             </View>
@@ -88,11 +101,13 @@ export const QuestBoardScreen: React.FC<Props> = ({ navigation }) => {
                   [
                     { 
                       text: '확인', 
-                      onPress: () => {
-                        setTimeout(() => {
-                          completeQuest(item.id);
+                      onPress: async () => {
+                        try {
+                          await completeQuest(item.id, profile.buddyGroupPin!);
                           Alert.alert('승인 완료', '동기가 퀘스트를 승인하여 보상을 획득했습니다!');
-                        }, 1500);
+                        } catch (e: any) {
+                          Alert.alert('승인 실패', e.message || '인증 중 오류가 발생했습니다.');
+                        }
                       }
                     }
                   ]

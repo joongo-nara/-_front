@@ -1,12 +1,19 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { useStore } from '../store/useStore';
 import { Header } from '../components/Header';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 
 export const MainScreen: React.FC = () => {
-  const { profile, quests, completeQuest } = useStore();
+  const { profile, quests, completeQuest, fetchMe, fetchQuests } = useStore();
   const navigation = useNavigation();
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchMe();
+      fetchQuests();
+    }, [fetchMe, fetchQuests])
+  );
 
   const dailyQuests = quests.filter(q => q.type === 'daily').slice(0, 3);
   const progressPercent = (profile.currentXP / profile.maxXP) * 100;
@@ -76,11 +83,13 @@ export const MainScreen: React.FC = () => {
                 [
                   { 
                     text: '확인', 
-                    onPress: () => {
-                      setTimeout(() => {
-                        completeQuest(quest.id);
+                    onPress: async () => {
+                      try {
+                        await completeQuest(quest.id, profile.buddyGroupPin!);
                         Alert.alert('승인 완료', '동기가 퀘스트를 승인하여 보상을 획득했습니다!');
-                      }, 1500);
+                      } catch (e: any) {
+                        Alert.alert('승인 실패', e.message || '인증 중 오류가 발생했습니다.');
+                      }
                     }
                   }
                 ]
@@ -91,7 +100,7 @@ export const MainScreen: React.FC = () => {
               <Text style={styles.questTitle}>{quest.title}</Text>
               <Text style={styles.questReward}>
                 보상: {quest.rewardXP} XP
-                {quest.targetStat && quest.statIncrease ? ` / ${quest.targetStat} +${quest.statIncrease}` : ''}
+                {quest.targetStat && quest.statIncrease ? ` / ${{ strength: '근력', stamina: '체력', intelligence: '지력', mental: '정신력', survival: '생존술' }[quest.targetStat] || quest.targetStat} +${quest.statIncrease}` : ''}
               </Text>
             </View>
             <Text style={quest.isCompleted ? styles.completedStatus : styles.pendingStatus}>

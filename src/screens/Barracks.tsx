@@ -4,6 +4,8 @@ import { useStore } from '../store/useStore';
 import { Header } from '../components/Header';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { TabParamList } from '../../App';
+import { useFocusEffect } from '@react-navigation/native';
+
 
 type Props = BottomTabScreenProps<TabParamList, 'BarracksTab'>;
 
@@ -19,50 +21,109 @@ interface PlatoonMember {
 
 const COMPANIES = ['전체', '1중대', '2중대', '3중대', '대대본부중대', '단본부중대', '단지원중대'];
 
-// 랭킹 구성을 위한 더미 데이터 (시나리오 부대 통합)
-const MOCK_RANKING_MEMBERS: PlatoonMember[] = [
-  { id: 'u0', nickname: '김민석', rank: '일병', company: '단본부중대', level: 5, xp: 600 },
-  { id: 'u1', nickname: '박상병', rank: '상병', company: '1중대', level: 35, xp: 15200 },
-  { id: 'u2', nickname: '이일병', rank: '일병', company: '2중대', level: 28, xp: 9200 },
-  { id: 'u3', nickname: '최병장', rank: '병장', company: '단지원중대', level: 40, xp: 21000 },
-  { id: 'u4', nickname: '정일병', rank: '일병', company: '3중대', level: 15, xp: 3600 },
-  { id: 'u5', nickname: '강이병', rank: '이병', company: '대대본부중대', level: 8, xp: 1150 },
-  { id: 'u6', nickname: '황병장', rank: '병장', company: '단본부중대', level: 42, xp: 22000 },
-];
-
 export const BarracksScreen: React.FC<Props> = ({ navigation: _navigation }) => {
   const profile = useStore(state => state.profile);
   const [selectedCompany, setSelectedCompany] = useState<string>('전체');
+  const [rankings, setRankings] = useState<PlatoonMember[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  // 현재 유저 데이터를 더미 리스트에 포함
-  const allMembers: PlatoonMember[] = [
-    ...MOCK_RANKING_MEMBERS,
-    { 
-      id: 'me', 
-      nickname: profile.nickname, 
-      rank: profile.rank, 
-      company: profile.company,
-      level: profile.level, 
-      xp: profile.currentXP, 
-      isMe: true 
+  const fetchRankings = React.useCallback(async (unit: string) => {
+    setIsLoading(true);
+    try {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      const mockOthers: PlatoonMember[] = [
+        { id: '1', nickname: '안상병', rank: '상병', company: '1중대', level: 39, xp: 3972, isMe: false },
+        { id: '2', nickname: '이일병', rank: '일병', company: '1중대', level: 12, xp: 1226, isMe: false },
+        { id: '3', nickname: '장일병', rank: '일병', company: '1중대', level: 16, xp: 1609, isMe: false },
+        { id: '4', nickname: '이상병', rank: '상병', company: '1중대', level: 39, xp: 3924, isMe: false },
+        { id: '5', nickname: '오병장', rank: '병장', company: '1중대', level: 10, xp: 1034, isMe: false },
+        { id: '6', nickname: '이상병', rank: '상병', company: '1중대', level: 32, xp: 3202, isMe: false },
+        { id: '7', nickname: '윤일병', rank: '일병', company: '1중대', level: 19, xp: 1903, isMe: false },
+        { id: '8', nickname: '강병장', rank: '병장', company: '1중대', level: 21, xp: 2168, isMe: false },
+        { id: '9', nickname: '최병장', rank: '병장', company: '2중대', level: 29, xp: 2991, isMe: false },
+        { id: '10', nickname: '안상병', rank: '상병', company: '2중대', level: 8, xp: 828, isMe: false },
+        { id: '11', nickname: '송이병', rank: '이병', company: '2중대', level: 15, xp: 1562, isMe: false },
+        { id: '12', nickname: '강일병', rank: '일병', company: '2중대', level: 1, xp: 117, isMe: false },
+        { id: '13', nickname: '윤이병', rank: '이병', company: '2중대', level: 4, xp: 416, isMe: false },
+        { id: '14', nickname: '송이병', rank: '이병', company: '2중대', level: 25, xp: 2544, isMe: false },
+        { id: '15', nickname: '한이병', rank: '이병', company: '2중대', level: 33, xp: 3339, isMe: false },
+        { id: '16', nickname: '윤일병', rank: '일병', company: '2중대', level: 15, xp: 1515, isMe: false },
+        { id: '17', nickname: '임이병', rank: '이병', company: '3중대', level: 4, xp: 464, isMe: false },
+        { id: '18', nickname: '이일병', rank: '일병', company: '3중대', level: 20, xp: 2006, isMe: false },
+        { id: '19', nickname: '홍이병', rank: '이병', company: '3중대', level: 20, xp: 2019, isMe: false },
+        { id: '20', nickname: '홍일병', rank: '일병', company: '3중대', level: 37, xp: 3792, isMe: false },
+        { id: '21', nickname: '정병장', rank: '병장', company: '3중대', level: 34, xp: 3495, isMe: false },
+        { id: '22', nickname: '오일병', rank: '일병', company: '3중대', level: 16, xp: 1631, isMe: false },
+        { id: '23', nickname: '조이병', rank: '이병', company: '3중대', level: 20, xp: 2011, isMe: false },
+        { id: '24', nickname: '조병장', rank: '병장', company: '3중대', level: 27, xp: 2788, isMe: false },
+        { id: '25', nickname: '전이병', rank: '이병', company: '대대본부중대', level: 2, xp: 226, isMe: false },
+        { id: '26', nickname: '강병장', rank: '병장', company: '대대본부중대', level: 10, xp: 1041, isMe: false },
+        { id: '27', nickname: '임일병', rank: '일병', company: '대대본부중대', level: 24, xp: 2499, isMe: false },
+        { id: '28', nickname: '안상병', rank: '상병', company: '대대본부중대', level: 20, xp: 2071, isMe: false },
+        { id: '29', nickname: '전일병', rank: '일병', company: '대대본부중대', level: 12, xp: 1285, isMe: false },
+        { id: '30', nickname: '이상병', rank: '상병', company: '대대본부중대', level: 6, xp: 606, isMe: false },
+        { id: '31', nickname: '조이병', rank: '이병', company: '대대본부중대', level: 13, xp: 1347, isMe: false },
+        { id: '32', nickname: '정이병', rank: '이병', company: '대대본부중대', level: 17, xp: 1701, isMe: false },
+        { id: '33', nickname: '황상병', rank: '상병', company: '단본부중대', level: 7, xp: 713, isMe: false },
+        { id: '34', nickname: '조병장', rank: '병장', company: '단본부중대', level: 31, xp: 3169, isMe: false },
+        { id: '35', nickname: '조상병', rank: '상병', company: '단본부중대', level: 33, xp: 3321, isMe: false },
+        { id: '36', nickname: '김상병', rank: '상병', company: '단본부중대', level: 34, xp: 3459, isMe: false },
+        { id: '37', nickname: '서일병', rank: '일병', company: '단본부중대', level: 1, xp: 196, isMe: false },
+        { id: '38', nickname: '안병장', rank: '병장', company: '단본부중대', level: 26, xp: 2611, isMe: false },
+        { id: '39', nickname: '이일병', rank: '일병', company: '단본부중대', level: 22, xp: 2204, isMe: false },
+        { id: '40', nickname: '송일병', rank: '일병', company: '단본부중대', level: 9, xp: 919, isMe: false },
+        { id: '41', nickname: '황일병', rank: '일병', company: '단지원중대', level: 15, xp: 1588, isMe: false },
+        { id: '42', nickname: '조일병', rank: '일병', company: '단지원중대', level: 40, xp: 4080, isMe: false },
+        { id: '43', nickname: '장상병', rank: '상병', company: '단지원중대', level: 16, xp: 1643, isMe: false },
+        { id: '44', nickname: '박일병', rank: '일병', company: '단지원중대', level: 32, xp: 3209, isMe: false },
+        { id: '45', nickname: '황이병', rank: '이병', company: '단지원중대', level: 33, xp: 3372, isMe: false },
+        { id: '46', nickname: '황상병', rank: '상병', company: '단지원중대', level: 7, xp: 718, isMe: false },
+        { id: '47', nickname: '서상병', rank: '상병', company: '단지원중대', level: 32, xp: 3246, isMe: false },
+        { id: '48', nickname: '윤일병', rank: '일병', company: '단지원중대', level: 15, xp: 1525, isMe: false },
+      ];
+      
+      const me: PlatoonMember = {
+        id: profile.userId,
+        nickname: profile.nickname,
+        rank: profile.rank,
+        company: profile.company,
+        level: profile.level,
+        xp: profile.currentXP,
+        isMe: true,
+      };
+      
+      let all = [...mockOthers, me].sort((a, b) => b.level - a.level);
+      
+      if (unit !== '전체') {
+        all = all.filter(m => m.company === unit);
+      }
+      
+      setRankings(all);
+    } catch (e) {
+      console.error("fetchRankings error", e);
+    } finally {
+      setIsLoading(false);
     }
-  ];
+  }, [profile.nickname]);
 
-  // 선택된 중대에 따라 필터링 후 레벨/경험치 정렬
-  const filteredMembers = allMembers
-    .filter(m => selectedCompany === '전체' || m.company === selectedCompany)
-    .sort((a, b) => {
-      if (b.level !== a.level) return b.level - a.level;
-      return b.xp - a.xp;
-    });
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchRankings(selectedCompany);
+    }, [selectedCompany, fetchRankings])
+  );
 
-  const handlePoke = (nickname: string) => {
-    Alert.alert('알림', `${nickname} 유저를 응원했습니다! 👍`);
+  const handlePoke = async (userId: string, nickname: string) => {
+    try {
+      await new Promise(resolve => setTimeout(resolve, 200));
+      Alert.alert('알림', `${nickname} 유저를 응원했습니다! 👍`);
+    } catch (e: any) {
+      Alert.alert('오류', e.message || '응원에 실패했습니다.');
+    }
   };
 
   const renderItem = ({ item, index }: { item: PlatoonMember; index: number }) => {
-    // 현재 리스트(필터링된 상태)에서의 내 위치를 찾음
-    const myIndex = filteredMembers.findIndex(m => m.isMe);
+    const myIndex = rankings.findIndex(m => m.isMe);
     const isHigherRanked = index < myIndex;
 
     return (
@@ -80,7 +141,7 @@ export const BarracksScreen: React.FC<Props> = ({ navigation: _navigation }) => 
         {isHigherRanked && !item.isMe && (
           <TouchableOpacity 
             style={styles.pokeButton} 
-            onPress={() => handlePoke(item.nickname)}
+            onPress={() => handlePoke(item.id, item.nickname)}
           >
             <Text style={styles.pokeButtonText}>👍 응원하기</Text>
           </TouchableOpacity>
@@ -117,12 +178,16 @@ export const BarracksScreen: React.FC<Props> = ({ navigation: _navigation }) => 
         <Text style={styles.listTitle}>
           {selectedCompany === '전체' ? '전체 유저 랭킹' : `${selectedCompany} 소속 랭킹`}
         </Text>
-        <FlatList
-          data={filteredMembers}
-          keyExtractor={(item) => item.id}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContainer}
-        />
+        {isLoading ? (
+          <Text style={styles.loadingText}>불러오는 중...</Text>
+        ) : (
+          <FlatList
+            data={rankings}
+            keyExtractor={(item) => item.id}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContainer}
+          />
+        )}
       </View>
     </View>
   );
@@ -165,6 +230,7 @@ const styles = StyleSheet.create({
   content: { flex: 1, padding: 16 },
   listTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold', marginBottom: 16 },
   listContainer: { paddingBottom: 20 },
+  loadingText: { color: '#888', marginTop: 20 },
   
   card: {
     flexDirection: 'row',

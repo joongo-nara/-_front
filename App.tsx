@@ -9,7 +9,7 @@ import { QuestBoardScreen } from './src/screens/QuestBoard';
 import { BarracksScreen } from './src/screens/Barracks';
 import { MyPageScreen } from './src/screens/MyPage';
 import { CommsScreen } from './src/screens/Comms';
-import { AdminDashboardScreen } from './src/screens/AdminDashboard';
+import { SplashScreen } from './src/screens/Splash';
 import { OnboardingScreen } from './src/screens/Onboarding';
 import { LoginScreen } from './src/screens/Login';
 import { SignupScreen } from './src/screens/Signup';
@@ -20,10 +20,10 @@ export type TabParamList = {
   BarracksTab: undefined;
   CommsTab: undefined;
   MyPageTab: undefined;
-  AdminTab: undefined;
 };
 
 export type AuthStackParamList = {
+  Splash: undefined;
   Onboarding: undefined;
   Login: undefined;
   Signup: undefined;
@@ -42,11 +42,8 @@ const MainIcon = ({ color }: { color: string }) => <Text style={[styles.tabIcon,
 const CommsIcon = ({ color }: { color: string }) => <Text style={[styles.tabIcon, { color }]}>📡</Text>;
 const BarracksIcon = ({ color }: { color: string }) => <Text style={[styles.tabIcon, { color }]}>🏆</Text>;
 const MyPageIcon = ({ color }: { color: string }) => <Text style={[styles.tabIcon, { color }]}>👤</Text>;
-const AdminIcon = ({ color }: { color: string }) => <Text style={[styles.tabIcon, { color }]}>🛡️</Text>;
 
 function TabNavigator() {
-  const isAdminMode = useStore((state) => state.isAdminMode);
-
   return (
     <Tab.Navigator
       screenOptions={{
@@ -92,23 +89,6 @@ function TabNavigator() {
           tabBarIcon: MyPageIcon
         }}
       />
-      {isAdminMode && (
-        <Tab.Screen
-          name="AdminTab"
-          component={AdminDashboardScreen as any}
-          options={{
-            tabBarLabel: '관리자',
-            tabBarIcon: AdminIcon,
-            tabBarStyle: {
-              backgroundColor: '#111',
-              borderTopWidth: 1,
-              borderTopColor: '#333',
-            },
-            tabBarActiveTintColor: '#4CAF50',
-            tabBarInactiveTintColor: '#666',
-          }}
-        />
-      )}
     </Tab.Navigator>
   );
 }
@@ -123,7 +103,8 @@ export default function App() {
     <SafeAreaProvider>
       <NavigationContainer>
         {!isAuthenticated ? (
-          <AuthStack.Navigator screenOptions={{ headerShown: false }}>
+          <AuthStack.Navigator screenOptions={{ headerShown: false }} initialRouteName="Splash">
+            <AuthStack.Screen name="Splash" component={SplashScreen as any} />
             <AuthStack.Screen name="Onboarding" component={OnboardingScreen as any} />
             <AuthStack.Screen name="Login" component={LoginScreen as any} />
             <AuthStack.Screen name="Signup" component={SignupScreen as any} />

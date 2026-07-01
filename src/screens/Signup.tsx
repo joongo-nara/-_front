@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, KeyboardAvoidingView, Platform, Alert, Modal } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, Modal } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../App';
 import { MILITARY_UNITS } from '../store/militaryUnits';
@@ -20,7 +20,7 @@ type Props = NativeStackScreenProps<AuthStackParamList, 'Signup'>;
 
 const BRANCHES = ['육군', '해군', '공군', '해병대'];
 const RANKS = ['이병', '일병', '상병', '병장'];
-const CLASSES = ['보병', '포병', '기갑', '통신병', '운전병', '의무병', '공병'];
+const CLASSES = ['소총수', '통신병', '의무병', '운전병', '취사병', '공병', '포병'];
 
 // 스타일을 컴포넌트 위에 정의해 변수 사용 전 선언 오류 방지
 const styles = StyleSheet.create({
@@ -102,24 +102,43 @@ const styles = StyleSheet.create({
 });
 
 export const SignupScreen: React.FC<Props> = ({ navigation: _ }) => {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [nickname, setNickname] = useState('');
   const [branch, setBranch] = useState(BRANCHES[0]);
   const [rank, setRank] = useState(RANKS[0]);
   const [playerClass, setPlayerClass] = useState(CLASSES[0]);
 
   // 3단계 소속 상태 관리
-  const [level1, setLevel1] = useState(Object.keys(MILITARY_UNITS)[0]);
-  const [level2, setLevel2] = useState(Object.keys(MILITARY_UNITS[Object.keys(MILITARY_UNITS)[0]])[0]);
-  const [level3, setLevel3] = useState(
-    MILITARY_UNITS[Object.keys(MILITARY_UNITS)[0]][Object.keys(MILITARY_UNITS[Object.keys(MILITARY_UNITS)[0]])[0]][0]
-  );
+  const [level1, setLevel1] = useState('');
+  const [level2, setLevel2] = useState('');
+  const [level3, setLevel3] = useState('');
 
-  const todayStr = '2026-06-29'; // 데모용 고정 날짜
+  const filteredCommands = Object.keys(MILITARY_UNITS).filter(cmd => {
+    if (branch === '육군') return cmd.includes('육군') || cmd.includes('국방부');
+    return cmd.includes(branch);
+  });
+
+  useEffect(() => {
+    if (filteredCommands.length > 0) {
+      const firstCmd = filteredCommands[0];
+      setLevel1(firstCmd);
+      const firstCorps = Object.keys(MILITARY_UNITS[firstCmd] || {})[0];
+      if (firstCorps) {
+        setLevel2(firstCorps);
+        const firstCo = MILITARY_UNITS[firstCmd][firstCorps]?.[0];
+        if (firstCo) setLevel3(firstCo);
+      }
+    }
+  }, [branch]);
+
+  const todayStr = new Date().toISOString().split('T')[0]; // 오늘 날짜로 자동 설정
   const [enlistDate, setEnlistDate] = useState(todayStr);
   const [calculatedDDay, setCalculatedDDay] = useState(500);
   const [showCalendar, setShowCalendar] = useState(false);
 
   const signup = useStore(state => state.signup);
+  const isLoading = useStore(state => state.isLoading);
 
   // 복무기간 자동 계산기
   const calculateDischarge = (dateString: string, currentBranch: string) => {
@@ -142,25 +161,30 @@ export const SignupScreen: React.FC<Props> = ({ navigation: _ }) => {
     calculateDischarge(enlistDate, branch);
   }, [enlistDate, branch]);
 
-  const handleSignup = () => {
+  const handleSignup = async () => {
+    if (username.trim() === '' || password.trim() === '') {
+      Alert.alert('알림', '아이디와 비밀번호를 모두 입력해주세요.');
+      return;
+    }
     if (nickname.trim() === '') {
       Alert.alert('알림', '닉네임을 입력해주세요.');
       return;
     }
-    const fullCompany = `${level1} ${level2} ${level3}`;
-    const generatedUserId = Math.floor(1000 + Math.random() * 9000).toString();
+    const fullCompany = level3; // UI를 깔끔하게 하기 위해 가장 하위 소속만 사용
     
-    signup({
-      userId: generatedUserId,
-      nickname,
-      rank,
-      company: fullCompany,
-      playerClass,
-      dDay: calculatedDDay,
-      level: 1,
-      currentXP: 0,
-      maxXP: 100,
-    });
+    try {
+      await signup({
+        username,
+        password,
+        nickname,
+        rank,
+        company: fullCompany,
+        playerClass,
+        dDay: calculatedDDay,
+      });
+    } catch (e: any) {
+      Alert.alert('오류', e.message || '회원가입에 실패했습니다.');
+    }
   };
 
   const renderSelection = (label: string, options: string[], selected: string, setter: (v: string) => void) => (
@@ -179,14 +203,42 @@ export const SignupScreen: React.FC<Props> = ({ navigation: _ }) => {
   return (
     <View style={styles.container}>
       <Header title="회원가입" showBackButton={true} />
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.keyboard}>
-        <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView 
+        contentContainerStyle={styles.content}
+        automaticallyAdjustKeyboardInsets={true}
+        keyboardShouldPersistTaps="handled"
+        style={styles.keyboard}
+      >
           <Text style={styles.title}>회원가입</Text>
-          <Text style={styles.subtitle}>복무성장 RPG에서 사용할 프로필을 설정합니다.</Text>
+          <Text style={styles.subtitle}>밀퀘스트에서 사용할 프로필을 설정합니다.</Text>
+
+          {/* 계정 정보 */}
+          <View style={styles.section}>
+            <Text style={styles.label}>아이디 (Username)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="사용할 아이디를 입력하세요"
+              placeholderTextColor="#666"
+              value={username}
+              onChangeText={setUsername}
+              autoCapitalize="none"
+            />
+          </View>
+          <View style={styles.section}>
+            <Text style={styles.label}>비밀번호 (Password)</Text>
+            <TextInput
+              style={styles.input}
+              placeholder="사용할 비밀번호를 입력하세요"
+              placeholderTextColor="#666"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+          </View>
 
           {/* 닉네임 */}
           <View style={styles.section}>
-            <Text style={styles.label}>닉네임</Text>
+            <Text style={styles.label}>닉네임 (화면 표시 이름)</Text>
             <TextInput
               style={styles.input}
               placeholder="사용할 닉네임을 입력하세요"
@@ -205,7 +257,7 @@ export const SignupScreen: React.FC<Props> = ({ navigation: _ }) => {
             <Text style={styles.label}>소속 부대 선택</Text>
             <View style={styles.cascadingContainer}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.scrollSelection}>
-                {Object.keys(MILITARY_UNITS).map(opt => (
+                {filteredCommands.map(opt => (
                   <TouchableOpacity 
                     key={opt} 
                     style={[styles.chip, level1 === opt && styles.chipSelected]} 
@@ -249,7 +301,7 @@ export const SignupScreen: React.FC<Props> = ({ navigation: _ }) => {
             </View>
           </View>
 
-          {renderSelection('주특기', CLASSES, playerClass, setPlayerClass)}
+          {renderSelection('보직 선택', CLASSES, playerClass, setPlayerClass)}
 
           {/* 입대일 */}
           <View style={styles.section}>
@@ -264,11 +316,10 @@ export const SignupScreen: React.FC<Props> = ({ navigation: _ }) => {
             </View>
           </View>
 
-          <TouchableOpacity style={styles.submitButton} onPress={handleSignup}>
-            <Text style={styles.submitButtonText}>회원가입 (시작하기)</Text>
+          <TouchableOpacity style={styles.submitButton} onPress={handleSignup} disabled={isLoading}>
+            <Text style={styles.submitButtonText}>{isLoading ? '처리 중...' : '회원가입 (시작하기)'}</Text>
           </TouchableOpacity>
         </ScrollView>
-      </KeyboardAvoidingView>
 
       {/* 캘린더 모달 */}
       <Modal visible={showCalendar} transparent={true} animationType="fade">

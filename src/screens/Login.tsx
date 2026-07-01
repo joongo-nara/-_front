@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Image } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, Image, ScrollView } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '../../App';
 import { useStore } from '../store/useStore';
@@ -10,23 +10,28 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   const [userId, setUserId] = useState('');
   const [password, setPassword] = useState('');
   const login = useStore(state => state.login);
+  const isLoading = useStore(state => state.isLoading);
 
-  const handleLogin = () => {
-    // 실제 서버가 없으므로 더미 로그인 처리
+  const handleLogin = async () => {
     if (userId.trim() !== '') {
-      login(); // 인증 상태 업데이트 (MainTabs로 이동됨)
+      try {
+        await login(userId, password);
+      } catch (e: any) {
+        Alert.alert('로그인 실패', e.message || '아이디 또는 비밀번호를 확인해주세요.');
+      }
     }
   };
 
   return (
     <KeyboardAvoidingView 
       style={styles.container} 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={styles.content}>
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={styles.content}>
         <View style={styles.logoContainer}>
-          <Text style={styles.logoIcon}>🛡️</Text>
-          <Text style={styles.title}>복무성장 RPG</Text>
+          <Image source={require('../assets/milquest_logo.png')} style={styles.imageLogo} resizeMode="contain" />
+          <Text style={styles.title}>밀퀘스트</Text>
           <Text style={styles.subtitle}>스마트한 군 생활의 시작</Text>
         </View>
 
@@ -53,11 +58,11 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
         </View>
 
         <TouchableOpacity 
-          style={[styles.loginButton, userId.trim() === '' && styles.loginButtonDisabled]} 
+          style={[styles.loginButton, (userId.trim() === '' || isLoading) && styles.loginButtonDisabled]} 
           onPress={handleLogin}
-          disabled={userId.trim() === ''}
+          disabled={userId.trim() === '' || isLoading}
         >
-          <Text style={styles.loginButtonText}>로그인</Text>
+          <Text style={styles.loginButtonText}>{isLoading ? '로그인 중...' : '로그인'}</Text>
         </TouchableOpacity>
 
         <View style={styles.footer}>
@@ -66,7 +71,8 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.signupText}>회원가입</Text>
           </TouchableOpacity>
         </View>
-      </View>
+        </View>
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };
@@ -75,6 +81,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#121212',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   content: {
     flex: 1,
@@ -85,9 +95,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 60,
   },
-  logoIcon: {
-    fontSize: 80,
+  imageLogo: {
+    width: 120,
+    height: 120,
     marginBottom: 15,
+    borderRadius: 25,
   },
   title: {
     fontSize: 32,

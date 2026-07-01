@@ -11,11 +11,22 @@ type Props = BottomTabScreenProps<TabParamList, 'MyPageTab'>;
 const CLASSES = ['소총수', '통신병', '의무병', '운전병', '취사병', '공병', '포병'];
 
 const MOCK_TITLES = [
-  { id: 't1', name: '신병' },
-  { id: 't2', name: '특급전사' },
-  { id: 't3', name: '불사조' },
-  { id: 't4', name: '내무반장' },
-  { id: 't5', name: '스나이퍼' },
+  { id: '신병', name: '신병' },
+  { id: '강철 신병', name: '강철 신병' },
+  { id: '무쇠 전사', name: '무쇠 전사' },
+  { id: '태산의 파괴자', name: '태산의 파괴자' },
+  { id: '전장의 철인', name: '전장의 철인' },
+  { id: '끝없는 진격', name: '끝없는 진격' },
+  { id: '두 개의 심장', name: '두 개의 심장' },
+  { id: '작전 분석관', name: '작전 분석관' },
+  { id: '전략 책사', name: '전략 책사' },
+  { id: '전장의 제갈량', name: '전장의 제갈량' },
+  { id: '의지의 군인', name: '의지의 군인' },
+  { id: '강철 멘탈', name: '강철 멘탈' },
+  { id: '부처님', name: '부처님' },
+  { id: '노련한 척후병', name: '노련한 척후병' },
+  { id: '고독한 늑대', name: '고독한 늑대' },
+  { id: '불사조', name: '불사조' },
 ];
 
 const getAsciiLabel = (cls: string) => {
@@ -128,7 +139,7 @@ export const MyPageScreen: React.FC<Props> = ({ navigation: _navigation }) => {
 
   const activeTitle = MOCK_TITLES.find(t => t.id === equippedTitleId)?.name || '';
   const totalPower = profile.stats.strength + profile.stats.stamina + profile.stats.intelligence + profile.stats.mental + profile.stats.survival;
-  const maxStatValue = 50; 
+  const maxStatValue = 100; 
 
   const getThemeColor = () => {
     switch(selectedClass) {
@@ -184,7 +195,7 @@ export const MyPageScreen: React.FC<Props> = ({ navigation: _navigation }) => {
 
 
         {/* Class Assignment */}
-        <Text style={styles.sectionTitle}>{"// 직업 선택"}</Text>
+        <Text style={styles.sectionTitle}>{"// 보직 선택"}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.chipScroll}>
           {CLASSES.map((cls) => {
             const isActive = selectedClass === cls;
@@ -289,21 +300,7 @@ export const MyPageScreen: React.FC<Props> = ({ navigation: _navigation }) => {
           <StatBar label="생존술" value={profile.stats.survival} max={maxStatValue} color="#4CAF50" />
         </View>
 
-        {/* Commander Mode Toggle */}
-        <Text style={styles.sectionTitle}>{"// 관리자 권한"}</Text>
-        <View style={styles.adminToggleCard}>
-          <View style={styles.adminToggleInfo}>
-            <Text style={styles.adminToggleTitle}>관리자 모드 활성화</Text>
-            <Text style={styles.adminToggleDesc}>전체 유저 통계 및 대시보드 관측 (심사위원용)</Text>
-          </View>
-          <Switch 
-            value={isAdminMode} 
-            onValueChange={toggleAdminMode}
-            trackColor={{ false: "#333", true: "#4CAF50" }}
-            thumbColor={isAdminMode ? "#FFF" : "#888"}
-          />
-        </View>
-        
+
         {/* Logout Button */}
         <TouchableOpacity style={styles.logoutButton} onPress={() => logout()}>
           <Text style={styles.logoutButtonText}>로그아웃 (전역하기)</Text>
@@ -488,30 +485,7 @@ const styles = StyleSheet.create({
     width: 30,
     textAlign: 'right',
   },
-  adminToggleCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#111',
-    padding: 20,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#333',
-    marginBottom: 20,
-  },
-  adminToggleInfo: {
-    flex: 1,
-  },
-  adminToggleTitle: {
-    color: '#FFF',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  adminToggleDesc: {
-    color: '#888',
-    marginTop: 4,
-  },
+
   logoutButton: {
     marginTop: 30,
     marginBottom: 40,

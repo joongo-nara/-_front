@@ -1,12 +1,85 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
 import { useStore, CommsPost } from '../store/useStore';
 import { Header } from '../components/Header';
+import { useFocusEffect } from '@react-navigation/native';
+
+const PostItem = ({ item }: { item: CommsPost }) => {
+  const [showComments, setShowComments] = useState(false);
+  const [commentText, setCommentText] = useState('');
+  const toggleLikeCommsPost = useStore(state => state.toggleLikeCommsPost);
+  const addCommentToPost = useStore(state => state.addCommentToPost);
+
+  const handleCommentSubmit = () => {
+    if (commentText.trim()) {
+      addCommentToPost(item.id, commentText.trim());
+      setCommentText('');
+    }
+  };
+
+  return (
+    <View style={styles.postCard}>
+      <View style={styles.postHeader}>
+        <Text style={styles.authorText}>[{item.authorClass}] {item.authorRank} {item.authorNickname}</Text>
+        <Text style={styles.timeText}>{item.timestamp}</Text>
+      </View>
+      <Text style={styles.contentText}>{item.content}</Text>
+      <View style={styles.postFooter}>
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => setShowComments(!showComments)}
+        >
+          <Text style={styles.actionText}>💬 댓글 ({item.commentList?.length || 0})</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.actionButton, item.isLikedByMe && styles.likedButton]} 
+          onPress={() => toggleLikeCommsPost(item.id)}
+        >
+          <Text style={[styles.actionText, item.isLikedByMe && styles.likedText]}>
+            {item.isLikedByMe ? '❤️ 좋아요' : '🤍 좋아요'} ({item.likes})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {showComments && (
+        <View style={styles.commentsSection}>
+          {item.commentList?.map(comment => (
+            <View key={comment.id} style={styles.commentItem}>
+              <View style={styles.commentHeader}>
+                <Text style={styles.commentAuthor}>{comment.authorRank} {comment.authorNickname}</Text>
+                <Text style={styles.commentTime}>{comment.timestamp}</Text>
+              </View>
+              <Text style={styles.commentContent}>{comment.content}</Text>
+            </View>
+          ))}
+          <View style={styles.commentInputRow}>
+            <TextInput 
+              style={styles.commentInput} 
+              placeholder="댓글을 입력하세요..." 
+              placeholderTextColor="#666"
+              value={commentText}
+              onChangeText={setCommentText}
+            />
+            <TouchableOpacity style={styles.commentSubmitButton} onPress={handleCommentSubmit}>
+              <Text style={styles.commentSubmitText}>등록</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+    </View>
+  );
+};
 
 export const CommsScreen: React.FC = () => {
   const commsPosts = useStore(state => state.commsPosts);
   const addCommsPost = useStore(state => state.addCommsPost);
-  const toggleLikeCommsPost = useStore(state => state.toggleLikeCommsPost);
+  const fetchPosts = useStore(state => state.fetchPosts);
+  
+  useFocusEffect(
+    useCallback(() => {
+      fetchPosts();
+    }, [fetchPosts])
+  );
   
   const [inputText, setInputText] = useState('');
 
@@ -16,26 +89,6 @@ export const CommsScreen: React.FC = () => {
       setInputText('');
     }
   };
-
-  const renderItem = ({ item }: { item: CommsPost }) => (
-    <View style={styles.postCard}>
-      <View style={styles.postHeader}>
-        <Text style={styles.authorText}>[{item.authorClass}] {item.authorRank} {item.authorNickname}</Text>
-        <Text style={styles.timeText}>{item.timestamp}</Text>
-      </View>
-      <Text style={styles.contentText}>{item.content}</Text>
-      <View style={styles.postFooter}>
-        <TouchableOpacity 
-          style={[styles.likeButton, item.isLikedByMe && styles.likedButton]} 
-          onPress={() => toggleLikeCommsPost(item.id)}
-        >
-          <Text style={[styles.likeText, item.isLikedByMe && styles.likedText]}>
-            {item.isLikedByMe ? '❤️ 좋아요' : '🤍 좋아요'} ({item.likes})
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
 
   return (
     <KeyboardAvoidingView 
@@ -47,7 +100,7 @@ export const CommsScreen: React.FC = () => {
       <FlatList
         data={commsPosts}
         keyExtractor={item => item.id}
-        renderItem={renderItem}
+        renderItem={({ item }) => <PostItem item={item} />}
         contentContainerStyle={styles.listContainer}
       />
 
@@ -61,7 +114,7 @@ export const CommsScreen: React.FC = () => {
           multiline
         />
         <TouchableOpacity style={styles.sendButton} onPress={handlePost}>
-          <Text style={styles.sendButtonText}>등록</Text>
+          <Text style={styles.sendButtonText}>작성</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -105,8 +158,9 @@ const styles = StyleSheet.create({
   postFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
+    gap: 8,
   },
-  likeButton: {
+  actionButton: {
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 4,
@@ -118,13 +172,72 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E3320',
     borderColor: '#4CAF50',
   },
-  likeText: {
+  actionText: {
     color: '#B0B0B0',
     fontSize: 12,
     fontWeight: 'bold',
   },
   likedText: {
     color: '#A5D6A7',
+  },
+
+  commentsSection: {
+    marginTop: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#333',
+  },
+  commentItem: {
+    marginBottom: 12,
+    backgroundColor: '#111',
+    padding: 10,
+    borderRadius: 6,
+  },
+  commentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  commentAuthor: {
+    color: '#B0B0B0',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
+  commentTime: {
+    color: '#666',
+    fontSize: 10,
+  },
+  commentContent: {
+    color: '#FFF',
+    fontSize: 13,
+  },
+  commentInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  commentInput: {
+    flex: 1,
+    backgroundColor: '#111',
+    color: '#FFF',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#333',
+    marginRight: 8,
+    fontSize: 13,
+  },
+  commentSubmitButton: {
+    backgroundColor: '#4CAF50',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+  },
+  commentSubmitText: {
+    color: '#000',
+    fontWeight: 'bold',
+    fontSize: 12,
   },
 
   inputContainer: {
